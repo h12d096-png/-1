@@ -3,14 +3,13 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>FocusGuard - AI 자세 교정 &amp; 순공 PiP 스터디</title>
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js" crossorigin="anonymous"></script>
+  <title>FocusGuard AI - 자세 교정 &amp; 순공 PiP 스터디</title>
   <style>
     :root {
-      --bg: #0b0f19;
-      --card: #131a2a;
-      --border: #1f2a44;
-      --text: #f1f5f9;
+      --bg: #090d16;
+      --card: #111827;
+      --border: #1f2937;
+      --text: #f8fafc;
       --muted: #94a3b8;
       --accent: #38bdf8;
       --neon: #4ade80;
@@ -18,19 +17,22 @@
       --danger: #ef4444;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Pretendard", "Segoe UI", Roboto, sans-serif;
-      background: var(--bg);
-      color: var(--text);
+    html, body {
+      width: 100%;
       min-height: 100vh;
+      background-color: #090d16;
+      color: #f8fafc;
+      font-family: -apple-system, BlinkMacSystemFont, "Pretendard", "Segoe UI", Roboto, sans-serif;
+    }
+    body {
       display: flex;
       flex-direction: column;
       align-items: center;
-      padding: 16px;
+      padding: 14px;
     }
-    .app-shell {
+    .app-container {
       width: 100%;
-      max-width: 780px;
+      max-width: 760px;
       display: flex;
       flex-direction: column;
       gap: 12px;
@@ -39,7 +41,7 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding: 10px 14px;
+      padding: 12px 16px;
       background: var(--card);
       border: 1px solid var(--border);
       border-radius: 14px;
@@ -48,7 +50,7 @@
       display: flex;
       align-items: center;
       gap: 8px;
-      font-weight: 700;
+      font-weight: 800;
       font-size: 16px;
     }
     .brand-dot {
@@ -58,79 +60,834 @@
       background: var(--neon);
       box-shadow: 0 0 10px var(--neon);
     }
-    .engine-badge {
+    .badge {
       font-size: 11px;
-      padding: 4px 8px;
+      padding: 4px 10px;
       border-radius: 999px;
       background: rgba(56, 189, 248, 0.15);
       color: var(--accent);
       border: 1px solid rgba(56, 189, 248, 0.35);
-      font-weight: 600;
+      font-weight: 700;
     }
-    .stage-card {
+
+    /* 카메라 뷰어 스테이지 */
+    .viewer-box {
       position: relative;
-      background: #060911;
+      width: 100%;
+      aspect-ratio: 16 / 10;
+      background: #04070d;
       border: 1px solid var(--border);
       border-radius: 16px;
       overflow: hidden;
-      aspect-ratio: 16 / 10;
       display: flex;
       align-items: center;
       justify-content: center;
     }
-    canvas#hudCanvas {
+    canvas#mainCanvas {
       width: 100%;
       height: 100%;
       object-fit: cover;
       display: block;
     }
-    video#rawVideo {
-      position: fixed;
-      width: 1px;
-      height: 1px;
-      opacity: 0;
-      pointer-events: none;
-    }
-    .placeholder-overlay {
+    .cover-screen {
       position: absolute;
       inset: 0;
+      background: radial-gradient(circle at center, #131c31 0%, #050811 100%);
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      gap: 10px;
-      background: radial-gradient(circle at center, #11192c 0%, #060911 100%);
       text-align: center;
       padding: 20px;
-      z-index: 5;
+      gap: 10px;
+      z-index: 10;
     }
-    .placeholder-overlay.hidden { display: none; }
+    .cover-screen.hidden {
+      display: none !important;
+    }
 
-    /* 거북목 감지 시 화면 전체 어두워짐(Dimming) 오버레이 (iPadOS Safari 완벽 호환) */
-    .screen-dim-overlay {
+    /* 거북목 감지 시 화면 전체 어두워짐(Dimming) 오버레이 */
+    .dim-overlay {
       position: fixed;
-      inset: 0;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
       width: 100vw;
-      height: 100dvh;
+      height: 100vh;
       background: rgba(0, 0, 0, 0);
       pointer-events: none;
-      z-index: 999999;
+      z-index: 99999;
       display: flex;
-      flex-direction: column;
       align-items: center;
       justify-content: center;
-      gap: 12px;
-      transition: background 0.35s ease, opacity 0.35s ease;
+      padding: 20px;
       opacity: 0;
+      transition: opacity 0.3s ease, background 0.3s ease;
+    }
+    .dim-overlay.warn {
+      background: rgba(0, 0, 0, 0.5);
+      opacity: 1;
+    }
+    .dim-overlay.bad {
+      background: rgba(0, 0, 0, 0.88);
+      opacity: 1;
+    }
+    .dim-card {
+      background: rgba(15, 23, 42, 0.95);
+      border: 2px solid var(--danger);
+      border-radius: 18px;
+      padding: 22px 28px;
       text-align: center;
-      padding: 24px;
+      box-shadow: 0 0 40px rgba(239, 68, 68, 0.5);
     }
-    .screen-dim-overlay.warn {
-      background: rgba(0, 0, 0, 0.48);
-      opacity: 1;
+    .dim-overlay.warn .dim-card {
+      border-color: var(--warn);
+      box-shadow: 0 0 30px rgba(245, 158, 11, 0.4);
     }
-    .screen-dim-overlay.bad {
-      background: rgba(0, 0, 0, 0.86);
-      opacity: 1;
+    .dim-title {
+      font-size: 20px;
+      font-weight: 800;
+      color: #f87171;
+      margin-bottom: 6px;
     }
-    .dim
+    .dim-overlay.warn .dim-title {
+      color: #fbbf24;
+    }
+    .dim-desc {
+      font-size: 13.5px;
+      color: #e2e8f0;
+    }
+
+    /* 상태바 & 알림 */
+    .status-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 11px 14px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      font-size: 13px;
+    }
+    .status-left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 600;
+    }
+    .dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: #64748b;
+    }
+    .dot.good { background: var(--neon); box-shadow: 0 0 8px var(--neon); }
+    .dot.warn { background: var(--warn); box-shadow: 0 0 8px var(--warn); }
+    .dot.bad { background: var(--danger); box-shadow: 0 0 8px var(--danger); }
+    .timer-badge {
+      font-variant-numeric: tabular-nums;
+      font-weight: 800;
+      color: var(--accent);
+      background: rgba(56, 189, 248, 0.14);
+      padding: 5px 10px;
+      border-radius: 8px;
+    }
+    .msg-box {
+      display: none;
+      padding: 11px 14px;
+      border-radius: 12px;
+      background: rgba(239, 68, 68, 0.15);
+      border: 1px solid rgba(239, 68, 68, 0.5);
+      color: #fecaca;
+      font-size: 12.5px;
+      line-height: 1.45;
+    }
+    .msg-box.show { display: block; }
+
+    /* 카메라 선택 */
+    .cam-row {
+      display: none;
+      align-items: center;
+      gap: 8px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      padding: 8px 12px;
+      border-radius: 12px;
+      font-size: 12.5px;
+    }
+    .cam-row.show { display: flex; }
+    select, input {
+      background: #090d16;
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 10px;
+      font-size: 12.5px;
+      outline: none;
+    }
+    select { flex: 1; }
+
+    /* 버튼 그룹 */
+    .btn-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    button {
+      border: none;
+      border-radius: 12px;
+      padding: 13px 14px;
+      font-size: 13.5px;
+      font-weight: 700;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+    button:active { opacity: 0.85; }
+    .btn-start {
+      grid-column: 1 / -1;
+      background: linear-gradient(135deg, #2563eb, #0284c7);
+      color: #ffffff;
+      font-size: 15px;
+    }
+    .btn-cal {
+      background: var(--card);
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+    .btn-pip {
+      background: rgba(74, 222, 128, 0.15);
+      color: var(--neon);
+      border: 1px solid rgba(74, 222, 128, 0.45);
+    }
+
+    /* 패널 박스 */
+    .panel {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .panel-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--muted);
+    }
+    .mode-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+    }
+    .mode-btn {
+      padding: 9px 6px;
+      font-size: 12px;
+      background: #090d16;
+      color: var(--muted);
+      border: 1px solid var(--border);
+    }
+    .mode-btn.active {
+      background: rgba(56, 189, 248, 0.16);
+      color: var(--accent);
+      border-color: var(--accent);
+    }
+    .app-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 6px;
+    }
+    .app-btn {
+      padding: 9px 6px;
+      font-size: 12px;
+      background: #090d16;
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+    .url-row {
+      display: flex;
+      gap: 6px;
+    }
+    .url-row input { flex: 1; }
+    .url-row button {
+      padding: 8px 14px;
+      font-size: 12px;
+      background: var(--accent);
+      color: #090d16;
+    }
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+    .stat-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 10px;
+      text-align: center;
+    }
+    .stat-title { font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+    .stat-num { font-size: 16px; font-weight: 800; }
+
+    @media (max-width: 480px) {
+      .viewer-box { aspect-ratio: 4 / 3; }
+      .app-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- 고개 숙임 감지 시 화면 어두워짐 경고창 -->
+  <div id="dimOverlay" class="dim-overlay">
+    <div class="dim-card">
+      <div id="dimTitle" class="dim-title">⚠️ 거북목 자세 감지!</div>
+      <div id="dimDesc" class="dim-desc">허리와 목을 바르게 펴면 화면이 다시 밝아집니다</div>
+    </div>
+  </div>
+
+  <div class="app-container">
+    <header>
+      <div class="brand">
+        <span class="brand-dot"></span>
+        <span>FocusGuard AI</span>
+      </div>
+      <span class="badge">비전 트래커 활성</span>
+    </header>
+
+    <div class="viewer-box">
+      <canvas id="mainCanvas" width="640" height="400"></canvas>
+      <div id="coverScreen" class="cover-screen">
+        <div style="font-size: 32px;">📷</div>
+        <div style="font-size: 14px; font-weight: 700;">아래 [자세 감지 시작하기] 버튼을 눌러주세요</div>
+        <div style="font-size: 12px; color: var(--muted);">고개를 숙이면 화면이 자동으로 어두워지며 자세를 교정합니다</div>
+      </div>
+    </div>
+
+    <div id="msgBox" class="msg-box"></div>
+
+    <div id="camRow" class="cam-row">
+      <span>🎥 카메라:</span>
+      <select id="camSelect"></select>
+    </div>
+
+    <div class="status-bar">
+      <div class="status-left">
+        <span id="statusDot" class="dot"></span>
+        <span id="statusLabel">대기 중 (카메라 연결 전)</span>
+      </div>
+      <div id="timerText" class="timer-badge">순공 00:00:00</div>
+    </div>
+
+    <div class="btn-grid">
+      <button id="btnStart" class="btn-start">▶ 자세 감지 시작하기</button>
+      <button id="btnCalibrate" class="btn-cal">🎯 바른 자세 영점</button>
+      <button id="btnPip" class="btn-pip">📺 PiP 위젯 띄우기</button>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head">
+        <span>🖼️ PiP 플로팅 위젯 모드</span>
+        <span id="modeLabel" style="color: var(--accent);">선택: 순공 대시보드</span>
+      </div>
+      <div class="mode-grid">
+        <button class="mode-btn active" data-mode="dashboard">📊 순공 대시보드</button>
+        <button class="mode-btn" data-mode="camera">🪞 자세 카메라</button>
+        <button class="mode-btn" data-mode="mini">⚡ 미니 경고 위젯</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head">
+        <span>🚀 PiP 실행 + 학습 앱 바로가기</span>
+        <span>터치 시 PiP 실행 후 이동</span>
+      </div>
+      <div class="app-grid">
+        <button class="app-btn" data-scheme="goodnotes://" data-url="https://www.goodnotes.com">📝 굿노트</button>
+        <button class="app-btn" data-scheme="youtube://" data-url="https://www.youtube.com">▶️ 유튜브</button>
+        <button class="app-btn" data-scheme="notion://" data-url="https://www.notion.so">📚 노션</button>
+        <button class="app-btn" data-scheme="https://www.megastudy.net" data-url="https://www.megastudy.net">🎓 메가스터디</button>
+      </div>
+      <div class="url-row">
+        <input type="text" id="inputUrl" placeholder="학습 사이트 입력 (예: ebsi.co.kr)" />
+        <button id="btnGoUrl">PiP + 이동</button>
+      </div>
+    </div>
+
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-title">자세 점수</div>
+        <div id="statScore" class="stat-num">--점</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-title">거북목 경고</div>
+        <div id="statWarn" class="stat-num">0회</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-title">목 비율 (Ratio)</div>
+        <div id="statRatio" class="stat-num">0.00</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 숨김 비디오 요소 (카메라 수신 및 PiP 출력용) -->
+  <video id="camVideo" playsinline webkit-playsinline muted autoplay style="display:none;"></video>
+  <video id="pipVideo" playsinline webkit-playsinline muted autoplay style="position:fixed;width:1px;height:1px;opacity:0;pointer-events:none;"></video>
+
+  <script>
+    (function () {
+      const camVideo = document.getElementById('camVideo');
+      const pipVideo = document.getElementById('pipVideo');
+      const mainCanvas = document.getElementById('mainCanvas');
+      const ctx = mainCanvas.getContext('2d');
+
+      const pipCanvas = document.createElement('canvas');
+      pipCanvas.width = 480;
+      pipCanvas.height = 270;
+      const pipCtx = pipCanvas.getContext('2d');
+
+      const scanCanvas = document.createElement('canvas');
+      scanCanvas.width = 80;
+      scanCanvas.height = 50;
+      const scanCtx = scanCanvas.getContext('2d', { willReadFrequently: true });
+
+      const coverScreen = document.getElementById('coverScreen');
+      const dimOverlay = document.getElementById('dimOverlay');
+      const dimTitle = document.getElementById('dimTitle');
+      const dimDesc = document.getElementById('dimDesc');
+      const msgBox = document.getElementById('msgBox');
+      const camRow = document.getElementById('camRow');
+      const camSelect = document.getElementById('camSelect');
+      const statusDot = document.getElementById('statusDot');
+      const statusLabel = document.getElementById('statusLabel');
+      const timerText = document.getElementById('timerText');
+      const statScore = document.getElementById('statScore');
+      const statWarn = document.getElementById('statWarn');
+      const statRatio = document.getElementById('statRatio');
+      const modeLabel = document.getElementById('modeLabel');
+
+      let running = false;
+      let stream = null;
+      let pipStream = null;
+      let pipMode = 'dashboard';
+
+      let baseRatio = null;
+      let currRatio = 0.42;
+      let score = 100;
+      let state = 'good';
+      let badCount = 0;
+      let warnTotal = 0;
+      let lastBeep = 0;
+      let seconds = 0;
+      let prevTime = Date.now();
+
+      let headX = 0.5;
+      let headY = 0.34;
+
+      function showNotice(text) {
+        msgBox.textContent = text;
+        msgBox.classList.add('show');
+      }
+
+      function hideNotice() {
+        msgBox.classList.remove('show');
+      }
+
+      function pad(n) {
+        return n < 10 ? '0' + n : '' + n;
+      }
+
+      function formatClock(s) {
+        const h = Math.floor(s / 3600);
+        const m = Math.floor((s % 3600) / 60);
+        const sec = s % 60;
+        return pad(h) + ':' + pad(m) + ':' + pad(sec);
+      }
+
+      function beepSound() {
+        try {
+          const AC = window.AudioContext || window.webkitAudioContext;
+          if (!AC) return;
+          const ac = new AC();
+          const osc = ac.createOscillator();
+          const gain = ac.createGain();
+          osc.frequency.value = 640;
+          gain.gain.value = 0.1;
+          osc.connect(gain);
+          gain.connect(ac.destination);
+          osc.start();
+          osc.stop(ac.currentTime + 0.2);
+        } catch (e) {}
+      }
+
+      function trackFacePosition() {
+        if (camVideo.videoWidth === 0) return;
+        scanCtx.save();
+        scanCtx.scale(-1, 1);
+        scanCtx.drawImage(camVideo, -80, 0, 80, 50);
+        scanCtx.restore();
+
+        const data = scanCtx.getImageData(0, 0, 80, 50).data;
+        let sx = 0, sy = 0, sw = 0;
+
+        for (let y = 4; y < 40; y++) {
+          for (let x = 14; x < 66; x++) {
+            const i = (y * 80 + x) * 4;
+            const r = data[i], g = data[i + 1], b = data[i + 2];
+            const skin = r > 70 && g > 40 && b > 25 && r > g && r > b && (r - g) > 10;
+            const weight = skin ? 3.5 : 0.1;
+            sx += x * weight;
+            sy += y * weight;
+            sw += weight;
+          }
+        }
+
+        if (sw > 0) {
+          const nx = (sx / sw) / 80;
+          const ny = Math.min(0.62, Math.max(0.15, (sy / sw) / 50));
+          headX += (nx - headX) * 0.28;
+          headY += (ny - headY) * 0.28;
+        }
+
+        const shoulderY = Math.min(0.88, headY + 0.34);
+        const shoulderW = 0.34;
+        currRatio = Math.max(0.05, shoulderY - headY) / shoulderW;
+
+        if (baseRatio === null) {
+          baseRatio = currRatio;
+        }
+
+        const drop = (baseRatio - currRatio) / baseRatio;
+        score = Math.round(Math.max(15, Math.min(100, 100 - Math.max(0, drop * 240))));
+
+        if (drop > 0.13) {
+          badCount++;
+          state = badCount > 10 ? 'bad' : 'warn';
+          if (badCount === 12 && Date.now() - lastBeep > 5000) {
+            warnTotal++;
+            lastBeep = Date.now();
+            statWarn.textContent = warnTotal + '회';
+            beepSound();
+          }
+        } else if (drop > 0.07) {
+          badCount = Math.max(0, badCount - 1);
+          state = 'warn';
+        } else {
+          badCount = 0;
+          state = 'good';
+        }
+
+        statScore.textContent = score + '점';
+        statRatio.textContent = currRatio.toFixed(2);
+        statusDot.className = 'dot ' + state;
+
+        if (state === 'good') {
+          statusLabel.textContent = '바른 자세 유지 중 · 순공 적립 중';
+          dimOverlay.className = 'dim-overlay';
+        } else if (state === 'warn') {
+          statusLabel.textContent = '고개가 약간 숙여졌습니다';
+          dimOverlay.className = 'dim-overlay warn';
+          dimTitle.textContent = '⚡ 고개가 숙여지고 있습니다';
+          dimDesc.textContent = '자세를 펴지 않으면 화면이 어두워집니다';
+        } else {
+          statusLabel.textContent = '⚠️ 거북목 감지! 허리와 목을 펴세요';
+          dimOverlay.className = 'dim-overlay bad';
+          dimTitle.textContent = '⚠️ 거북목 자세 감지!';
+          dimDesc.textContent = '허리와 목을 바르게 펴면 화면이 다시 밝아집니다';
+        }
+      }
+
+      function drawHUD(target, w, h) {
+        const nx = headX * w;
+        const ny = headY * h;
+        const lx = Math.max(0.18, headX - 0.17) * w;
+        const rx = Math.min(0.82, headX + 0.17) * w;
+        const sy = Math.min(0.88, headY + 0.34) * h;
+        const mx = (lx + rx) / 2;
+
+        const color = state === 'bad' ? '#ef4444' : (state === 'warn' ? '#f59e0b' : '#4ade80');
+
+        target.save();
+        if (baseRatio !== null) {
+          const targetY = sy - baseRatio * (rx - lx);
+          target.strokeStyle = 'rgba(56, 189, 248, 0.85)';
+          target.lineWidth = 2;
+          target.setLineDash([6, 6]);
+          target.beginPath();
+          target.moveTo(lx - 20, targetY);
+          target.lineTo(rx + 20, targetY);
+          target.stroke();
+          target.setLineDash([]);
+        }
+
+        target.strokeStyle = color;
+        target.lineWidth = 4;
+        target.beginPath();
+        target.moveTo(nx, ny);
+        target.lineTo(mx, sy);
+        target.moveTo(lx, sy);
+        target.lineTo(rx, sy);
+        target.stroke();
+
+        target.lineWidth = 2.5;
+        target.beginPath();
+        target.arc(nx, ny, 22, 0, Math.PI * 2);
+        target.stroke();
+
+        [
+          [nx, ny],
+          [lx, sy],
+          [rx, sy],
+          [mx, sy]
+        ].forEach(function (pt) {
+          target.beginPath();
+          target.arc(pt[0], pt[1], 5, 0, Math.PI * 2);
+          target.fillStyle = color;
+          target.fill();
+          target.strokeStyle = '#ffffff';
+          target.lineWidth = 1.5;
+          target.stroke();
+        });
+
+        target.fillStyle = 'rgba(6, 9, 17, 0.8)';
+        target.fillRect(w - 170, h - 34, 160, 24);
+        target.fillStyle = color;
+        target.font = 'bold 12px monospace';
+        target.fillText('POSTURE ' + score + '% · R:' + currRatio.toFixed(2), w - 162, h - 18);
+        target.restore();
+      }
+
+      function drawPiPFrame() {
+        const w = pipCanvas.width;
+        const h = pipCanvas.height;
+        const color = state === 'bad' ? '#ef4444' : (state === 'warn' ? '#f59e0b' : '#4ade80');
+
+        pipCtx.fillStyle = state === 'bad' ? '#240707' : '#090d16';
+        pipCtx.fillRect(0, 0, w, h);
+
+        if (pipMode === 'camera' && camVideo.videoWidth > 0) {
+          pipCtx.save();
+          pipCtx.scale(-1, 1);
+          pipCtx.drawImage(camVideo, -w, 0, w, h);
+          pipCtx.restore();
+          if (state === 'bad') {
+            pipCtx.fillStyle = 'rgba(0,0,0,0.7)';
+            pipCtx.fillRect(0, 0, w, h);
+          }
+          drawHUD(pipCtx, w, h);
+          return;
+        }
+
+        if (pipMode === 'mini') {
+          pipCtx.strokeStyle = color;
+          pipCtx.lineWidth = 8;
+          pipCtx.strokeRect(4, 4, w - 8, h - 8);
+          pipCtx.fillStyle = color;
+          pipCtx.font = 'bold 28px sans-serif';
+          pipCtx.textAlign = 'center';
+          pipCtx.fillText(state === 'bad' ? '⚠️ 거북목 경고!' : '✅ 바른 자세 순공 중', w / 2, 105);
+          pipCtx.fillStyle = '#ffffff';
+          pipCtx.font = 'bold 46px monospace';
+          pipCtx.fillText(formatClock(seconds), w / 2, 175);
+          pipCtx.textAlign = 'left';
+          return;
+        }
+
+        pipCtx.strokeStyle = state === 'bad' ? '#ef4444' : '#1f2937';
+        pipCtx.lineWidth = 4;
+        pipCtx.strokeRect(2, 2, w - 4, h - 4);
+        pipCtx.fillStyle = '#38bdf8';
+        pipCtx.font = 'bold 18px sans-serif';
+        pipCtx.fillText('FocusGuard AI · 순공 대시보드', 24, 38);
+        pipCtx.fillStyle = '#ffffff';
+        pipCtx.font = 'bold 54px monospace';
+        pipCtx.fillText(formatClock(seconds), 24, 114);
+        pipCtx.fillStyle = color;
+        pipCtx.font = 'bold 22px sans-serif';
+        const txt = state === 'bad' ? '⚠️ 자세 교정 필요!' : (state === 'warn' ? '주의: 고개 숙임' : '● 바른 자세 유지 중');
+        pipCtx.fillText(txt + ' (' + score + '점)', 24, 168);
+        pipCtx.fillStyle = '#94a3b8';
+        pipCtx.font = '16px sans-serif';
+        pipCtx.fillText('거북목 경고: ' + warnTotal + '회  |  목 비율: ' + currRatio.toFixed(2), 24, 218);
+      }
+
+      function loop() {
+        if (!running) return;
+
+        const now = Date.now();
+        if (now - prevTime >= 1000) {
+          if (state !== 'bad') seconds++;
+          timerText.textContent = '순공 ' + formatClock(seconds);
+          prevTime = now;
+        }
+
+        const w = mainCanvas.width;
+        const h = mainCanvas.height;
+
+        if (camVideo.videoWidth > 0) {
+          ctx.save();
+          ctx.scale(-1, 1);
+          ctx.drawImage(camVideo, -w, 0, w, h);
+          ctx.restore();
+          trackFacePosition();
+          drawHUD(ctx, w, h);
+        }
+
+        drawPiPFrame();
+        requestAnimationFrame(loop);
+      }
+
+      function preparePiP() {
+        drawPiPFrame();
+        if (!pipStream && pipCanvas.captureStream) {
+          pipStream = pipCanvas.captureStream(15);
+          pipVideo.srcObject = pipStream;
+          pipVideo.play().catch(function () {});
+        }
+      }
+
+      async function loadCameraList() {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return;
+        const list = await navigator.mediaDevices.enumerateDevices();
+        const cams = list.filter(function (d) { return d.kind === 'videoinput'; });
+        if (cams.length > 1) {
+          camSelect.innerHTML = '';
+          cams.forEach(function (c, i) {
+            const opt = document.createElement('option');
+            opt.value = c.deviceId;
+            opt.textContent = c.label || ('카메라 ' + (i + 1));
+            camSelect.appendChild(opt);
+          });
+          camRow.classList.add('show');
+        }
+      }
+
+      async function initCamera(deviceId) {
+        hideNotice();
+        preparePiP();
+
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          showNotice('이 브라우저에서는 카메라 기능을 지원하지 않습니다.');
+          return;
+        }
+
+        if (stream) {
+          stream.getTracks().forEach(function (t) { t.stop(); });
+        }
+
+        const constraints = deviceId
+          ? { video: { deviceId: { exact: deviceId } }, audio: false }
+          : { video: { facingMode: 'user' }, audio: false };
+
+        try {
+          stream = await navigator.mediaDevices.getUserMedia(constraints);
+          camVideo.srcObject = stream;
+          await camVideo.play();
+
+          coverScreen.classList.add('hidden');
+          document.getElementById('btnStart').textContent = '🔄 카메라 다시 연결';
+
+          await loadCameraList();
+          if (deviceId) camSelect.value = deviceId;
+
+          if (!running) {
+            running = true;
+            prevTime = Date.now();
+            loop();
+          }
+        } catch (err) {
+          statusDot.className = 'dot bad';
+          statusLabel.textContent = '카메라 연결 실패';
+          showNotice('⚠️ 카메라 접근 권한을 [허용]해 주세요 (' + err.name + ').');
+        }
+      }
+
+      function openPiP() {
+        hideNotice();
+        preparePiP();
+        try {
+          if (pipVideo.webkitSupportsPresentationMode && typeof pipVideo.webkitSetPresentationMode === 'function') {
+            const mode = pipVideo.webkitPresentationMode === 'picture-in-picture' ? 'inline' : 'picture-in-picture';
+            pipVideo.webkitSetPresentationMode(mode);
+          } else if (document.pictureInPictureElement) {
+            document.exitPictureInPicture();
+          } else if (pipVideo.requestPictureInPicture) {
+            pipVideo.requestPictureInPicture().catch(function () {
+              showNotice('⚠️ 먼저 [자세 감지 시작하기]를 누른 뒤 다시 시도해 주세요.');
+            });
+          } else {
+            showNotice('아이패드 상단 [•••] 버튼에서 Split View(화면 분할)를 사용해 주세요.');
+          }
+        } catch (e) {
+          showNotice('⚠️ PiP 창을 열 수 없습니다. 먼저 [자세 감지 시작하기]를 눌러 주세요.');
+        }
+      }
+
+      document.getElementById('btnStart').addEventListener('click', function () {
+        initCamera(null);
+      });
+
+      camSelect.addEventListener('change', function (e) {
+        initCamera(e.target.value);
+      });
+
+      document.getElementById('btnCalibrate').addEventListener('click', function () {
+        baseRatio = currRatio;
+        badCount = 0;
+        state = 'good';
+        dimOverlay.className = 'dim-overlay';
+        statusLabel.textContent = '🎯 현재 자세를 바른 자세 영점으로 저장했습니다!';
+      });
+
+      document.getElementById('btnPip').addEventListener('click', openPiP);
+
+      document.querySelectorAll('.mode-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          document.querySelectorAll('.mode-btn').forEach(function (b) { b.classList.remove('active'); });
+          btn.classList.add('active');
+          pipMode = btn.getAttribute('data-mode');
+          modeLabel.textContent = '선택: ' + btn.textContent.replace(/^[^\s]+\s/, '');
+          drawPiPFrame();
+        });
+      });
+
+      document.querySelectorAll('.app-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          openPiP();
+          const scheme = btn.getAttribute('data-scheme');
+          const url = btn.getAttribute('data-url');
+          setTimeout(function () {
+            if (scheme.indexOf('http') === 0) {
+              window.open(scheme, '_blank');
+            } else {
+              window.location.href = scheme;
+              setTimeout(function () {
+                if (!document.hidden) window.open(url, '_blank');
+              }, 1200);
+            }
+          }, 300);
+        });
+      });
+
+      document.getElementById('btnGoUrl').addEventListener('click', function () {
+        let val = document.getElementById('inputUrl').value.trim();
+        if (!val) return;
+        if (!/^https?:\/\//i.test(val)) val = 'https://' + val;
+        openPiP();
+        setTimeout(function () {
+          window.open(val, '_blank');
+        }, 300);
+      });
+
+      drawPiPFrame();
+    })();
+  </script>
+</body>
+</html>
